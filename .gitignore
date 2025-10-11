@@ -1,0 +1,9 @@
+*_final.md
+*_merged.md
+*.aux
+*.log
+_minted/
+*.out
+.DS_Store
+*.tex
+*.toc
