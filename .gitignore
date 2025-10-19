@@ -8,3 +8,4 @@ _minted/
 *.tex
 *.toc
 tester/
+.vscode/
