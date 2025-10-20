@@ -66,4 +66,8 @@ namespace Dinic{
 		return ret;
 	}
 }
+/*Main*/
+while(Dinic::Bfs(g)){
+	ans+=Dinic::Dfs(g,s,Inf);
+}
 ```
