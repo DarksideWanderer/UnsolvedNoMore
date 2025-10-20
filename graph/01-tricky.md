@@ -105,9 +105,9 @@
    
    这本来是一个偏序集上的定理 , 任意的有向无环图传递闭包后都相当于偏序集
    
-   构造方案: 拆点二分图的 $x_1\rightarrow x_{2+n} \rightarrow x_2 \rightarrow x_{3+n} \cdots x_{k+n}$ 对应的是原 $Dag$ 中的一条路径 $x_1\rightarrow x_2\rightarrow x_3\cdots x_k,$ $x_1$ 即为路径起点, $x_k$ 即为终点. 先将所有的终点放入独立集集合 $H,$ 再将与 $H$ 连有向边的点加入集合 $\N,$ 由于已经传递闭包, 当 $H\Cap\N=\varnothing$ 时, 显然在原图中没有路径相连. 
+   构造方案: 拆点二分图的 $x_1\rightarrow x_{2+n} \rightarrow x_2 \rightarrow x_{3+n} \cdots x_{k+n}$ 对应的是原 $Dag$ 中的一条路径 $x_1\rightarrow x_2\rightarrow x_3\cdots x_k,$ $x_1$ 即为路径起点, $x_k$ 即为终点. 先将所有的终点放入独立集集合 $H,$ 再将与 $H$ 连有向边的点加入集合 $ N,$ 由于已经传递闭包, 当 $H\Cap N=\varnothing$ 时, 显然在原图中没有路径相连. 
    
-   否则, 将 $H-H\Cap\N$ 的元素 $y$ 向路径起点跳 , 设 使他往上的是 $x$ . 论证 $y$ 不会跳超过其路径起点 .
+   否则, 将 $H-H\Cap N$ 的元素 $y$ 向路径起点跳 , 设 使他往上的是 $x$ . 论证 $y$ 不会跳超过其路径起点 .
    
    1. $x$ 是路径的终点, 如果 $y$ 是路径的起点, 那么 $x\rightarrow y$ 可以组成更小的路径覆盖.
    
