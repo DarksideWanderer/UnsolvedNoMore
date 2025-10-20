@@ -33,36 +33,36 @@ namespace Dinic{
 		std::fill(all(g.High),0);
 		std::queue<int>Q;
 		Q.push(g.src);
-		g.High[g.src]=1;
+		g.High[g.src] = 1;
 		while(!Q.empty()){
-			int fr=Q.front();Q.pop();
-			g.Cur[fr]=g.Head[fr];
-			gep(k,fr,g.Head,g.Er){
-				int to=g.Er[k].to;
-				if(g.Er[k].flow>0&&g.High[to]==0){
-					g.High[to]=g.High[fr]+1;
-					if(to==g.snk)return true;
+			int fr = Q.front();Q.pop();
+			g.Cur[fr] = g.Head[fr];
+			gep(k, fr, g.Head,g.Er) {
+				int to = g.Er[k].to;
+				if(g.Er[k].flow > 0 && g.High[to] == 0) {
+					g.High[to] = g.High[fr] + 1;
+					if(to == g.snk)return true;
 					Q.push(to);
 				}
 			}
 		}
 		return false;
 	}
-	flowtype Dfs(Graphs&g,int fr,flowtype f){
-		if(fr==g.snk)return f;
-		flowtype test,ret=0;
-		for(auto&k=g.Cur[fr];k!=-1;k=g.Er[k].nxt){
-			auto to=g.Er[k].to;
-			auto flow=g.Er[k].flow;
-			if(flow>0&&g.High[to]==g.High[fr]+1){
-				test=Dfs(g,to,std::min(flow,f-ret));
-				ret+=test;
-				g.Er[k].flow-=test;
-				g.Er[k^1].flow+=test;
-				if(f==ret)return f;
+	flowtype Dfs(Graphs&g, int fr, flowtype f) {
+		if(fr == g.snk) return f;
+		flowtype test, ret = 0;
+		for(auto &k = g.Cur[fr]; k != -1; k = g.Er[k].nxt){
+			auto to = g.Er[k].to;
+			auto flow = g.Er[k].flow;
+			if(flow > 0 && g.High[to] == g.High[fr] + 1) {
+				test = Dfs(g, to, std::min(flow, f-ret));
+				ret += test;
+				g.Er[k].flow -= test;
+				g.Er[k^1].flow += test;
+				if(f == ret) return f;
 			}
 		}
-		g.High[fr]=0;
+		g.High[fr] = 0;
 		return ret;
 	}
 }
