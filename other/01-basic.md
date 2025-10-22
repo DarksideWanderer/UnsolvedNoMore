@@ -8,3 +8,10 @@
 #define all(x) x.begin(),x.end()
 template<typename T>void Clear(T&x){T y;x.swap(y);}
 ```
+
+1. 添加数组 : `*(type(*)[num])array`
+2. `(long long(*)[20])A._M_impl._M_start`
+
+```cpp
+g++ Sol.cpp -Wall -std=c++23 -g -Wl,-stack_size -Wl,0x20000000 -o Sol -DLOCAL
+```
