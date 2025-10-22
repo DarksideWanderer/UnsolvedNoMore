@@ -27,3 +27,17 @@
    
    即 $G$ 中各个元素的不动点数量的平均数。
 9. 树上区间动态规划
+10. Lagrange 反演公式
+    
+    令 $f(x),g(x)\in\mathbb{C}\lbrack\lbrack x\rbrack\rbrack$ 满足 $f(g(x))=g(f(x))=x$。取 $\Phi(x)\in\mathbb{C}\lbrack\lbrack x\rbrack\rbrack$（或 $\Phi(x)\in\mathbb{C}\left(\left(x\right)\right)$），那么
+    
+    $$
+    \begin{aligned}
+    \lbrack x^n\rbrack\Phi(f(x))&=\lbrack x^{n-1}\rbrack\Phi(x)\frac{g'(x)}{g(x)}\left(\frac{x}{g(x)}\right)^n \\
+    &=\lbrack x^{-1}\rbrack\frac{\Phi(x)g'(x)}{g(x)^{n+1}}
+    \end{aligned}
+    $$
+	
+	有复合逆 , 需要满足常数项为0 , 一次项不为 0 .
+	
+	求复合逆可以推式子之后用牛顿迭代 . 
