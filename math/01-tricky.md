@@ -1,1 +1,16 @@
 # Tricky
+
+1. lcm 卷积
+   
+   接下来考虑卷积怎么做。假设我们要求 $h(x) = f(x) \times g(x)$，卷积是 lcm 卷积；我们构造 $F(n) = \sum_{d|n} f(d)$。有结论：
+   
+   $H(x) = F(x) \cdot G(x)$
+   这里是点值对应相乘。然后我们根据莫比乌斯反演有 $f(n) = \sum_{d|n} \mu \left(\frac{n}{d}\right) F(d)$ 可以反演出 $h(x)$。单次卷积朴素调和级数是 $O(n \ln n)$，使用狄利克雷前缀和是 $O(n \ln \ln n)$。
+   
+   gcd 卷积反过来
+
+2. 0/1 分数规划
+3. 整除分块
+   
+   向上取整 , 从 $r$ 推出 $l$ , $l=\left\lceil \frac {n} {\lceil \frac n r \rceil}  \right\rceil$
+   向下取整 , 从 $l$ 推出 $r$ , $r=\left\lfloor \frac {n} {\lfloor \frac n r \rfloor}  \right\rfloor$

@@ -1,6 +1,6 @@
 # Tarjan 
 
-点双连通分量对边染色
+## 点双连通分量对边染色
 
 ```cpp
 static std::function<void(int,int)> Tarjan=[&](int from,int root)->void {
@@ -29,6 +29,8 @@ static std::function<void(int,int)> Tarjan=[&](int from,int root)->void {
 for(int i=1;i<=n;i++)
     if(!dfn[i])Tarjan(i,i);
 ```
+
+## 点双连通分量对点染色
 
 ```cpp
 static std::function<void(int, int)> Tarjan = [&](int from, int root) -> void {
@@ -90,6 +92,8 @@ inline void Work(){
 }
 ```
 
+## 边双连通分量
+
 ```cpp
 int Belong[MaxN],edcc;
 inline void Dfs(int from){
@@ -115,6 +119,8 @@ inline void Work(){
 	}
 }
 ```
+
+## 强连通分量
 
 ```cpp
 Graphs<MaxN,MaxM>G;

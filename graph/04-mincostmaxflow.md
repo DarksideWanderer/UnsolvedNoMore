@@ -1,6 +1,6 @@
 # Min Cost Max Flow
 
-Spfa
+## Spfa
 
 ```cpp
 namespace MCMF{
@@ -93,7 +93,7 @@ while(MCMF::Spfa(g)){
 }
 ```
 
-Dijkstra (没有负圈的情况下)
+## Dijkstra (没有负圈的情况下)
 
 ```cpp
 namespace MCMF{

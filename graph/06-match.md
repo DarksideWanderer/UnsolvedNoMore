@@ -1,6 +1,6 @@
 # Match
 
-K Algorithm
+## 二分图匹配
 
 ```cpp
 struct Graph {
@@ -88,7 +88,7 @@ int main() {
 }
 ```
 
-KM Algorithm
+## 二分图最大权完美匹配
 
 ```cpp
 using ll = long long;
@@ -203,7 +203,7 @@ int main() {
 }
 ```
 
-带花树
+## 一般图匹配
 
 ```cpp
 struct Graph {
