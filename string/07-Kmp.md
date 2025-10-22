@@ -25,3 +25,14 @@ int main(){
 	return 0;
 }
 ```
+
+## Kmp 自动机
+
+```cpp
+for(int i = 1, fail = 0; i <= n; i ++) {
+        fail = nxt[fail][s[i]]; // 注意这一行不能和下一行互换
+        nxt[i - 1][s[i]] = i;
+        for(int j = 0; j < m; j ++)
+                nxt[i][j] = nxt[fail][j];
+}
+```

@@ -14,3 +14,8 @@
    
    向上取整 , 从 $r$ 推出 $l$ , $l=\left\lceil \frac {n} {\lceil \frac n r \rceil}  \right\rceil$
    向下取整 , 从 $l$ 推出 $r$ , $r=\left\lfloor \frac {n} {\lfloor \frac n r \rfloor}  \right\rfloor$
+
+4. dp 套 dp
+5. dp 通过性质减少有效状态和转移
+6. 树上背包 , $sz_u+sz_v$ 优化转移
+7. wqs 二分 ?
