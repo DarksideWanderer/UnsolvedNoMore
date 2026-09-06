@@ -1,141 +1,272 @@
-# Flow Tricky
+# 网络流建模技巧
 
-## 特定流量
+本文件代码直接使用 `03-maxflow.md` 中的 `Dinic`。
 
-如果你知道网络的最大流 , 你可以求出 最小费用特定流
-
-## 分析最小割
-
-考虑点集之间哪些边被割即可 $.$
-
-如果两条相邻的边都断流了 $,$ 当作只有某一条边被割即可 $.$
+```cpp
+using flow_i128 = __int128_t;
+```
 
 ## 最大权闭合子图
 
-闭合子图
+有向图中选择点集 $S$，并要求 $u\in S$ 且存在依赖边 $u\to v$ 时必有 $v\in S$。点有正负权，目标是最大化点权和。
 
-> 对于一个有向图 $G=(V,E),$ 点集 $V'\subseteq V,$ 且 $\forall x\in V',$ $x$ 的出边指向 $V'$ 集合内的点 $.$ 点集 $V'$ 即为原图 $G$ 的闭合子图 $.$
+- 权值 $w_i>0$：连 `source -> i`，容量 $w_i$；
+- 权值 $w_i<0$：连 `i -> sink`，容量 $-w_i$；
+- 依赖 $u\to v$：连容量 `infinity` 的 `u -> v`。
 
-问题
+答案是“所有正权之和减最小割”。最大流结束后残量网络中源点可达的原图点就是一组最优解。
 
-> 给每个点附上一个权值 $($ 自然有负数 $),$ 求原图最大的闭合子图 $.$
+```cpp
+struct ClosureResult {
+    long long value;
+    vector<int> selected;
+};
 
-我们利用网络流工具 $,$ 对于原图中存在的边 $,$ 我们连一条流量为 $\infty$ 的有向边 $,$ 对每个点 $,$ 若点值为正 $,$ 从源点连一条流量为点权的边 $,$ 若点权为负 $,$ 则向汇点连一条流量为点权的绝对值的边 $.$
+ClosureResult maximum_weight_closure(
+    const vector<long long>& weight,
+    const vector<pair<int, int>>& dependencies) {
+    int n = (int)weight.size();
+    int source = n, sink = n + 1;
+    flow_i128 positive_sum = 0;
+    for (long long value : weight) {
+        if (value > 0) positive_sum += value;
+        assert(value != numeric_limits<long long>::min());
+    }
+    assert(positive_sum < numeric_limits<long long>::max());
+    long long infinity = (long long)positive_sum + 1;
 
-证明此图的 最小割与原答案的和 等于 所有正权边的点值和 $:$
+    Dinic flow(n + 2);
+    for (int i = 0; i < n; ++i) {
+        if (weight[i] > 0) flow.add_edge(source, i, weight[i]);
+        if (weight[i] < 0) flow.add_edge(i, sink, -weight[i]);
+    }
+    for (auto [u, v] : dependencies) {
+        assert(0 <= u && u < n && 0 <= v && v < n);
+        flow.add_edge(u, v, infinity);
+    }
 
-简单割 
+    long long cut = flow.max_flow(source, sink);
+    vector<bool> source_side = flow.min_cut_side(source);
+    vector<int> selected;
+    for (int i = 0; i < n; ++i) {
+        if (source_side[i]) selected.push_back(i);
+    }
+    return {(long long)positive_sum - cut, selected};
+}
+```
 
-> 如果所有割边都满足其中一个端点是源点或汇点 $,$ 即为简单割 $.$
-
-1. 可以证明此图最小割为简单割 $.$ 因为如果不是的话一定有流量为 $\infty$ 的边被割了 $,$ 这是矛盾的 $.$
-
-2. 割和闭合子图一一对应 $,$ 闭合子图中的点和源点 $S$ **与** 其他点 $T$ 的割即为闭合子图对应的割 $.$ 
-
-   如果闭合图不是简单割 $,$ 那么说明有一条边容量为 $\infty,$ 则说明闭合图中有一条出边的终点不在闭合图中 $,$ 矛盾 $.$
-
-   因为简单割不含  $\infty$ 的边 $,$ 所以不含有连向另一个集合 $($ 除 $T)$ 的点 $,$ 所以其出边的终点都在简单割内部 $,$ 符合闭合图定义 $.$
-
-3. 数量关系 $:$
-
-   我们知道最小割的值为 $($ 源点到其他点的流量 $+$ 闭合子图到汇点的流量 $).$ 答案为 $($ 源点到闭合子图的流量 $-$ 闭合子图到汇点的流量 $).$ 他们的和即为正权点的权值和 $.$
+`infinity = positive_sum + 1` 已经足够：空集给出容量至多 `positive_sum` 的有限割，所以最小割绝不会切断依赖边。代码要求正权总和能放入 `long long`；否则最大流容量本身也需要换成 `__int128`。
 
 ## 最大密度子图
 
-子图密度 
-
-> 对于一个无向图  $G=(V,E)$ $,$ 选择一个点集 $V'\subseteq V,$ 选择边集 $E',$ $e\in E'$ 满足两个端点 $x,y\in V',$ 这个子图的密度为 $\frac{|E'|}{|V'|}.$
-
-直接考虑 $0/1$ 分数规划 $,$ 二分 $T.$
+对无自环无向图选择非空点集 $S$，密度定义为诱导子图边数除以点数：
 
 $$
-\exists \frac {|E'|}{|V'|}\ge T\\
-\exists |E'|-T|V'|\ge 0\\
-\exists T|V'|-|E'|\le 0
+\rho(S)=\frac{|E(S)|}{|S|}.
 $$
 
-由于点集选定后 $,$ 导出子图必然是所有边集中最优的直接考虑点集和导出子图边集的关系 $.$
+判断是否存在 $\rho(S)>g$ 时，为每个点建立网络：
+
+- `source -> v` 容量 $m$；
+- `v -> sink` 容量 $m+2g-\deg(v)$；
+- 每条无向边 $(u,v)$ 加容量为 1 的 `u -> v` 和 `v -> u`。
+
+若割的源侧原图点集为 $S$，割容量恰为
 
 $$
-|E'|=\frac{\sum_{v\in V'}Deg_v-Cnt_v}{2}\\
-\begin{aligned}
-T|V'|-|E'|&=T|V'|-\frac{\sum_{v\in V'}Deg_v-Cnt_v}{2}\\
-&=\frac{\sum_{v\in V'}2T-Deg_v+Cnt_v}{2}
-\end{aligned}
+nm+2g|S|-2|E(S)|.
 $$
 
-$Cnt_v$ 即为点 $v$ 和子图外的点组成的边数 $,$ 不难发现这个可以用割来求 $.$
+因此最小割小于 $nm$ 当且仅当存在密度大于 $g$ 的非空子图。下面把所有容量乘 `scale` 后做整数二分，避免浮点容量误差；返回值绝对误差不超过 $1/(2\,scale)$。
 
-对于原图中的边 $(x,y)$ 连一条流量为 $1$ 的双向边 $,$ 对原图所有的点 $,$ 从源点连出一条流量为边数 $m$ 的边 $,$ 连出一条流量为 $2T-Deg_v+m$ 到汇点 $,$ 这两个 $m$ 是为了防止边流量小于零 $.$
+```cpp
+long double maximum_density_subgraph(
+    int n, const vector<pair<int, int>>& edges,
+    long long scale = 1000000) {
+    assert(n > 0 && scale > 0);
+    int m = (int)edges.size();
+    vector<int> degree(n);
+    for (auto [u, v] : edges) {
+        assert(0 <= u && u < n && 0 <= v && v < n && u != v);
+        ++degree[u];
+        ++degree[v];
+    }
 
-此图的最小割等于 
-$$
-\begin{aligned}
-&C(s,x\in T)+C(s,t)+C(x\in S,y\in T)+C(x\in S,t) \\
-=& (\sum_{x\in T}m)+0+(\sum_{x\in S}\sum_{y\in T} 1)+\sum_{x\in S}(2T-Deg_x+m)\\
-=&nm+\sum_{x\in S}(2T-Deg_x)+(\sum_{x\in S}\sum_{y\in T} 1)\\
-=&nm+2T|V'|-2|E'|
-\end{aligned}
-$$
+    flow_i128 capacity_bound = (flow_i128)3 * m * scale;
+    flow_i128 total_bound = (flow_i128)n * m * scale;
+    assert(capacity_bound <= numeric_limits<long long>::max());
+    assert(total_bound <= numeric_limits<long long>::max());
+    long long base_capacity = (long long)((flow_i128)m * scale);
+    long long baseline = (long long)total_bound;
 
-和原式有关 $,$ 直接做完 $.$
+    auto feasible = [&](long long density_scaled) {
+        int source = n, sink = n + 1;
+        Dinic flow(n + 2);
+        for (int v = 0; v < n; ++v) {
+            flow.add_edge(source, v, base_capacity);
+            long long sink_capacity =
+                (long long)(m - degree[v]) * scale + 2 * density_scaled;
+            flow.add_edge(v, sink, sink_capacity);
+        }
+        for (auto [u, v] : edges) {
+            flow.add_edge(u, v, scale);
+            flow.add_edge(v, u, scale);
+        }
+        return flow.max_flow(source, sink, baseline) < baseline;
+    };
 
-## 无源汇上下界可行流
+    long long low = -1;
+    long long high = (long long)m * scale;
+    while (high - low > 1) {
+        long long middle = low + (high - low) / 2;
+        if (feasible(middle)) low = middle;
+        else high = middle;
+    }
+    if (m == 0) return 0;
+    return (low + high) / (2.0L * scale);
+}
+```
 
-给定无源汇流量网络 $G$。询问是否存在一种标定每条边流量的方式，使得每条边流量满足上下界同时每一个点流量平衡。
+一次判定是一遍最大流，总复杂度再乘 $O(\log(m\,scale))$。平行边可以保留并分别计数；自环应预先按题意处理。若题目要求输出点集，在最终可行的 `low` 上再跑一次流并取 `min_cut_side(source)`。
 
-不妨假设每条边已经流了 $b(u,v)$ 的流量，设其为初始流。同时我们在新图中加入 $u$ 连向 $v$ 的流量为 $c(u,v) - b(u,v)$ 的边。考虑在新图上进行调整。
+## 上下界可行流
 
-由于最大流需要满足初始流量平衡条件（最大流可以看成是下界为 $0$ 的上下界最大流），但是构造出来的初始流很有可能不满足初始流量平衡。假设一个点初始流入流量减初始流出流量为 $M$。
+对边 $u\to v$ 的流量限制 $lower\le f\le upper$，先让它流过 `lower`，残量边容量变成 `upper-lower`。令 `balance[v]` 为下界造成的“流入减流出”：
 
-若 $M=0$，此时流量平衡，不需要附加边。
+- `balance[v] > 0`：加 `super_source -> v`；
+- `balance[v] < 0`：加 `v -> super_sink`。
 
-若 $M>0$，此时入流量过大，需要新建附加源点 $S'$，$S'$ 向其连流量为 $M$ 的附加边。
+超级源的边全部满流，当且仅当存在可行环流。
 
-若 $M<0$，此时出流量过大，需要新建附加汇点 $T'$，其向 $T'$ 连流量为 $-M$ 的附加边。
+```cpp
+struct BoundedEdge {
+    int from, to;
+    long long lower, upper;
+};
 
-如果附加边满流，说明这一个点的流量平衡条件可以满足，否则这个点的流量平衡条件不满足。（因为原图加上附加流之后才会满足原图中的流量平衡。）
+bool feasible_circulation(int n, const vector<BoundedEdge>& edges) {
+    int super_source = n, super_sink = n + 1;
+    Dinic flow(n + 2);
+    vector<flow_i128> balance(n);
+    for (const BoundedEdge& edge : edges) {
+        assert(0 <= edge.from && edge.from < n);
+        assert(0 <= edge.to && edge.to < n);
+        assert(0 <= edge.lower && edge.lower <= edge.upper);
+        flow.add_edge(edge.from, edge.to, edge.upper - edge.lower);
+        balance[edge.from] -= edge.lower;
+        balance[edge.to] += edge.lower;
+    }
 
-在建图完毕之后跑 $S'$ 到 $T'$ 的最大流，若 $S'$ 连出去的边全部满流，则存在可行流，否则不存在。
+    flow_i128 demand = 0;
+    for (int v = 0; v < n; ++v) {
+        if (balance[v] > 0) {
+            assert(balance[v] <= numeric_limits<long long>::max());
+            flow.add_edge(super_source, v, (long long)balance[v]);
+            demand += balance[v];
+        } else if (balance[v] < 0) {
+            assert(-balance[v] <= numeric_limits<long long>::max());
+            flow.add_edge(v, super_sink, (long long)-balance[v]);
+        }
+    }
+    assert(demand <= numeric_limits<long long>::max());
+    return flow.max_flow(super_source, super_sink, (long long)demand) == demand;
+}
+```
 
-## 有源汇上下界可行流
+## 有源汇上下界最大流 / 最小流
 
-给定有源汇流量网络 $G$。询问是否存在一种标定每条边流量的方式，使得每条边流量满足上下界同时除了源点和汇点每一个点流量平衡。
+约定流值非负。先加辅助边 `sink -> source`，求出一组可行环流；辅助边上的流量就是当前 $s\to t$ 流值。随后必须在**同一张残量网络**里同时删除辅助边的正反残量边以及超级源汇的边：
 
-假设源点为 $S$，汇点为 $T$。
+- 最大流再跑 `source -> sink`；
+- 最小流再跑 `sink -> source`，但最多撤回当前流值，避免把流值减成负数。
 
-则我们可以加入一条 $T$ 到 $S$ 的上界为 $\infty$，下界为 $0$ 的边转化为无源汇上下界可行流问题。
+`Dinic::flow_on(handle)` 读取一条原始正向边当前已经流过的量。返回结果同时恢复每条输入边的实际流量。代码要求所有边容量总和能放进 `long long`；这也是当前 Dinic 能安全保存总流量的条件。
 
-若有解，则 $S$ 到 $T$ 的可行流流量等于 $T$ 到 $S$ 的附加边的流量。
+```cpp
+struct BoundedFlowResult {
+    long long value;
+    vector<long long> edge_flow;
+};
 
-## 有源汇上下界最大流
+optional<BoundedFlowResult> bounded_st_flow(
+    int n, int source, int sink,
+    const vector<BoundedEdge>& edges, bool maximize) {
+    assert(0 <= source && source < n);
+    assert(0 <= sink && sink < n && source != sink);
+    int super_source = n, super_sink = n + 1;
+    Dinic flow(n + 2);
+    vector<flow_i128> balance(n);
+    vector<Dinic::EdgeHandle> original_edges;
+    flow_i128 capacity_sum = 0;
 
-给定有源汇流量网络 $G$。询问是否存在一种标定每条边流量的方式，使得每条边流量满足上下界同时除了源点和汇点每一个点流量平衡。如果存在，询问满足标定的最大流量。
+    for (const BoundedEdge& edge : edges) {
+        assert(0 <= edge.from && edge.from < n);
+        assert(0 <= edge.to && edge.to < n);
+        assert(0 <= edge.lower && edge.lower <= edge.upper);
+        original_edges.push_back(
+            flow.add_edge(edge.from, edge.to, edge.upper - edge.lower));
+        balance[edge.from] -= edge.lower;
+        balance[edge.to] += edge.lower;
+        capacity_sum += edge.upper;
+    }
+    assert(capacity_sum <= numeric_limits<long long>::max());
+    long long infinity = (long long)max<flow_i128>(1, capacity_sum);
+    auto auxiliary = flow.add_edge(sink, source, infinity);
 
-我们找到网络上的任意一个可行流。如果找不到解就可以直接结束。
+    vector<Dinic::EdgeHandle> super_edges;
+    flow_i128 demand = 0;
+    for (int v = 0; v < n; ++v) {
+        if (balance[v] > 0) {
+            assert(balance[v] <= numeric_limits<long long>::max());
+            super_edges.push_back(flow.add_edge(
+                super_source, v, (long long)balance[v]));
+            demand += balance[v];
+        } else if (balance[v] < 0) {
+            assert(-balance[v] <= numeric_limits<long long>::max());
+            super_edges.push_back(flow.add_edge(
+                v, super_sink, (long long)-balance[v]));
+        }
+    }
+    assert(demand <= numeric_limits<long long>::max());
+    if (flow.max_flow(super_source, super_sink, (long long)demand)
+        != demand) {
+        return nullopt;
+    }
 
-否则我们考虑删去所有附加边之后的残量网络并且在网络上进行调整。
+    long long base_value = flow.flow_on(auxiliary);
+    for (auto handle : super_edges) flow.disable_edge(handle);
+    flow.disable_edge(auxiliary);
 
-我们在残量网络上再跑一次 $S$ 到 $T$ 的最大流，将可行流流量和最大流流量相加即为答案。
+    flow_i128 answer = base_value;
+    if (maximize) {
+        answer += flow.max_flow(source, sink);
+    } else {
+        answer -= flow.max_flow(sink, source, base_value);
+    }
+    assert(0 <= answer && answer <= numeric_limits<long long>::max());
 
-"一个非常易错的问题"
+    vector<long long> edge_flow(edges.size());
+    for (int i = 0; i < (int)edges.size(); ++i) {
+        edge_flow[i] = edges[i].lower + flow.flow_on(original_edges[i]);
+    }
+    return BoundedFlowResult{(long long)answer, move(edge_flow)};
+}
 
-$S$ 到 $T$ 的最大流直接在跑完有源汇上下界可行的残量网络上跑。
+optional<BoundedFlowResult> maximum_bounded_flow(
+    int n, int source, int sink, const vector<BoundedEdge>& edges) {
+    return bounded_st_flow(n, source, sink, edges, true);
+}
 
-千万不可以在原来的流量网络上跑。
+optional<BoundedFlowResult> minimum_bounded_flow(
+    int n, int source, int sink, const vector<BoundedEdge>& edges) {
+    return bounded_st_flow(n, source, sink, edges, false);
+}
+```
 
-## 有源汇上下界最小流
+注意：只判断可行时仍可直接使用上一节的 `feasible_circulation`。最大值和最小值必须分别从初始网络求解，不能在已经求过最大流的残量网络上继续求最小流。
 
-给定有源汇流量网络 $G$。询问是否存在一种标定每条边流量的方式，使得每条边流量满足上下界同时除了源点和汇点每一个点流量平衡。如果存在，询问满足标定的最小流量。
+## 其他常见建模
 
-类似的，我们考虑将残量网络中不需要的流退掉。
-
-我们找到网络上的任意一个可行流。如果找不到解就可以直接结束。
-
-否则我们考虑删去所有附加边之后的残量网络。
-
-我们在残量网络上再跑一次 $T$ 到 $S$ 的最大流，将可行流流量减去最大流流量即为答案。
-
-## 费用流
-
-费用流流程基本与最大流一致
+- 最大流值已知时，可以给最大流加上恰好该流量的限制，再求最小费用，从而得到最小费用最大流。
+- 点权路径或点容量限制使用拆点：`in(v) -> out(v)` 承载点的容量或费用。
+- 不要凭图形猜最小割；固定源侧点集，逐类列出真正从源侧指向汇侧的边，通常更不容易漏项。

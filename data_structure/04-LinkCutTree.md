@@ -1,85 +1,163 @@
-# LinkCutTree
+# Link–Cut Tree
+
+维护动态森林，支持连边、删边、单点修改和路径异或查询。点编号为 1-based；0 是空节点。所有公开函数均会维护辅助树状态。
 
 ```cpp
-struct LinkCutTrees{
-        #define MaxN 410000
-        int Son[MaxN][2],Dad[MaxN];
-        int Sum[MaxN],Data[MaxN];
-        bool Rev[MaxN];
-        void PushUp(int now){
-                //Size[now]=Size[Son[now][0]]+Size[Son[now][1]]+1;
-                Sum[now]=Sum[Son[now][0]]^Sum[Son[now][1]]^Data[now];
+#include <bits/stdc++.h>
+#include <cassert>
+using namespace std;
+
+class LinkCutTree {
+    struct Node {
+        int child[2]{0, 0};
+        int parent = 0;
+        int value = 0;
+        int path_xor = 0;
+        bool reversed = false;
+    };
+
+    vector<Node> nodes;
+
+    bool is_splay_root(int node) const {
+        int parent = nodes[node].parent;
+        return parent == 0 ||
+               (nodes[parent].child[0] != node &&
+                nodes[parent].child[1] != node);
+    }
+
+    void pull(int node) {
+        nodes[node].path_xor =
+            nodes[nodes[node].child[0]].path_xor ^
+            nodes[node].value ^
+            nodes[nodes[node].child[1]].path_xor;
+    }
+
+    void apply_reverse(int node) {
+        if (node == 0) return;
+        swap(nodes[node].child[0], nodes[node].child[1]);
+        nodes[node].reversed = !nodes[node].reversed;
+    }
+
+    void push(int node) {
+        if (!nodes[node].reversed) return;
+        apply_reverse(nodes[node].child[0]);
+        apply_reverse(nodes[node].child[1]);
+        nodes[node].reversed = false;
+    }
+
+    void rotate(int node) {
+        int parent = nodes[node].parent;
+        int grandparent = nodes[parent].parent;
+        int direction = nodes[parent].child[1] == node;
+        int middle = nodes[node].child[direction ^ 1];
+
+        if (!is_splay_root(parent)) {
+            nodes[grandparent].child[nodes[grandparent].child[1] == parent] =
+                node;
         }
-        void PushDown(int now){
-                if(Rev[now]){
-                        if(Son[now][0]){
-                                Rev[Son[now][0]]^=1;
-                                std::swap(Son[Son[now][0]][0],Son[Son[now][0]][1]);
-                        }
-                        if(Son[now][1]){
-                                Rev[Son[now][1]]^=1;
-                                std::swap(Son[Son[now][1]][0],Son[Son[now][1]][1]);
-                        }
-                        Rev[now]=false;
-                }
+        nodes[node].parent = grandparent;
+        nodes[node].child[direction ^ 1] = parent;
+        nodes[parent].parent = node;
+        nodes[parent].child[direction] = middle;
+        if (middle != 0) nodes[middle].parent = parent;
+        pull(parent);
+        pull(node);
+    }
+
+    void splay(int node) {
+        vector<int> ancestors{node};
+        for (int current = node; !is_splay_root(current); ) {
+            current = nodes[current].parent;
+            ancestors.push_back(current);
         }
-        bool NotRoot(int now){return Son[Dad[now]][0]==now||Son[Dad[now]][1]==now;}
-        bool Which(int now){return Son[Dad[now]][1]==now;}
-        void Union(int dad,int son){if(son!=0)Dad[son]=dad;}
-        void Rotate(int now){
-                int dad=Dad[now];bool flag=Which(now);
-                Son[dad][flag]=Son[now][!flag];
-                Union(dad,Son[now][!flag]);
-                if(NotRoot(dad))Son[Dad[dad]][Which(dad)]=now;//虚边不能乱接 
-                Union(Dad[dad],now);
-                Son[now][!flag]=dad;
-                Union(now,dad);
-                PushUp(dad);PushUp(now);
-                return;
+        while (!ancestors.empty()) {
+            push(ancestors.back());
+            ancestors.pop_back();
         }
-        void SplayInit(int now){
-                if(NotRoot(now))SplayInit(Dad[now]);
-                PushDown(now);
+
+        while (!is_splay_root(node)) {
+            int parent = nodes[node].parent;
+            int grandparent = nodes[parent].parent;
+            if (!is_splay_root(parent)) {
+                bool node_direction = nodes[parent].child[1] == node;
+                bool parent_direction =
+                    nodes[grandparent].child[1] == parent;
+                rotate(node_direction == parent_direction ? parent : node);
+            }
+            rotate(node);
         }
-        void Splay(int now){
-                SplayInit(now);
-                for(int dad=Dad[now];NotRoot(now);Rotate(now),dad=Dad[now])
-                        if(NotRoot(dad))Rotate(Which(now)^Which(dad)?now:dad);
+    }
+
+    void access(int node) {
+        int preferred_child = 0;
+        for (int current = node; current != 0;
+             current = nodes[current].parent) {
+            splay(current);
+            nodes[current].child[1] = preferred_child;
+            pull(current);
+            preferred_child = current;
         }
-        void Access(int now){
-                for(int tmp=0;now;tmp=now,now=Dad[now])//son比now深,所以now的右儿子为son 
-                        Splay(now),Son[now][1]=tmp,PushUp(now);
+        splay(node);
+    }
+
+public:
+    explicit LinkCutTree(int node_count) : nodes(node_count + 1) {}
+
+    void set_value(int node, int value) {
+        access(node);
+        nodes[node].value = value;
+        pull(node);
+    }
+
+    void make_root(int node) {
+        access(node);
+        apply_reverse(node);
+    }
+
+    int find_root(int node) {
+        access(node);
+        while (true) {
+            push(node);
+            if (nodes[node].child[0] == 0) break;
+            node = nodes[node].child[0];
         }
-        void MakeRoot(int now){
-                Access(now);Splay(now);//now到根之后,没有左子树,深度最深 
-                Rev[now]^=1;//翻转之后,没有右子树,深度最浅,即为根 
-                std::swap(Son[now][0],Son[now][1]);
+        splay(node);
+        return node;
+    }
+
+    bool connected(int lhs, int rhs) {
+        if (lhs == rhs) return true;
+        make_root(lhs);
+        return find_root(rhs) == lhs;
+    }
+
+    bool link(int lhs, int rhs) {
+        make_root(lhs);
+        if (find_root(rhs) == lhs) return false;
+        nodes[lhs].parent = rhs;
+        return true;
+    }
+
+    bool cut(int lhs, int rhs) {
+        make_root(lhs);
+        access(rhs);
+        if (nodes[rhs].child[0] != lhs ||
+            nodes[lhs].child[1] != 0) {
+            return false;
         }
-        int FindRoot(int now){
-                Access(now);Splay(now);
-                while(Son[now][0])PushDown(now),now=Son[now][0];//找一个深度最小的点就是根 
-                Splay(now);
-                return now;
-        }
-        bool Link(int x,int y){
-                MakeRoot(x);
-                if(FindRoot(y)==x)return false;//在一棵树内 
-                Dad[x]=y;
-                return true;
-        }
-        void Split(int x,int y){//把 x-y 拉成一条链 
-                MakeRoot(x);Access(y);Splay(y);
-        //把 y 当成 Splay 根,然后就可以通过 y 询问链信息 
-        }
-        bool Cut(int x,int y){
-                MakeRoot(x);
-                if(FindRoot(y)!=x||Dad[y]!=x||Son[y][0])return false;
-        //建议手模
-                Dad[y]=0;Son[x][1]=0;
-                return true;
-        }
-        int Query(int x,int y){Split(x,y);return Sum[y];}
-        void Modify(int x,int v){Access(x);Splay(x);Data[x]=v;PushUp(x);}
-        #undef MaxN
+        nodes[rhs].child[0] = 0;
+        nodes[lhs].parent = 0;
+        pull(rhs);
+        return true;
+    }
+
+    optional<int> query_path_xor(int lhs, int rhs) {
+        if (!connected(lhs, rhs)) return nullopt;
+        make_root(lhs);
+        access(rhs);
+        return nodes[rhs].path_xor;
+    }
 };
 ```
+
+每个操作的均摊复杂度为 $O(\log n)$。这里只维护可交换的路径异或；改为路径和、最大值等信息时修改 `pull` 即可。若维护有方向的非交换信息，需要同时保存正序和逆序聚合值。

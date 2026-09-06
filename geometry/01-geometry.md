@@ -1,223 +1,209 @@
-# Geometry Template
+# 二维计算几何基础
+
+计算几何最容易出错的地方不是公式，而是**谓词是否精确**。当输入坐标是整数时，方向、共线、跨立和点在多边形内等离散判断应优先使用整数叉积；只有交点坐标、距离和圆等必须产生实数的操作才使用浮点数。
+
+下面约定整数坐标和差的绝对值不超过 $10^9$。叉积使用 `__int128_t`，因此不会发生 64 位乘法溢出。
+
+## 整数点、点积和叉积
 
 ```cpp
-#include<bits/stdc++.h>
+#include <bits/stdc++.h>
+#include <cassert>
+using namespace std;
 
-#define ld long double
+namespace geometry {
 
-template<typename T>
-void Clear(T&x){T y;x.swap(y);}
-template<typename... Args>
-std::istream& InPut(Args&...x){return(std::cin>>...>>x);}
-template<typename... Args>
-std::ostream& OutPut(const Args&...x){return(std::cout<<...<<x);}
-template<typename...Args>
-std::ostream& ErrPut(const Args&...x){return(std::cerr<<...<<x);}
-void Flush(){std::cout.flush();}
+using i64 = long long;
+using i128 = __int128_t;
 
-const ld Eps=1e-6;
-const ld Pi=acos(-1.0);
+struct IPoint {
+    i64 x = 0;
+    i64 y = 0;
 
-bool Gt(const ld&a,const ld&b){return a-b>Eps;}
-bool Ge(const ld&a,const ld&b){return a-b>=-Eps;}
-bool Lt(const ld&a,const ld&b){return a-b<-Eps;}
-bool Le(const ld&a,const ld&b){return a-b<=Eps;}
-bool Eq(const ld&a,const ld&b){return std::fabs(a-b)<=Eps;}
-ld Acos(ld t){
-    assert(!std::isnan(t));
-    return std::acos(std::max<ld>(std::min<ld>(t,1.0),-1.0));
-}
-
-struct Points2{
-    ld x,y;
-    Points2(){}
-    Points2(const ld&_x,const ld&_y):x(_x),y(_y){}
-    friend std::istream& operator>>(std::istream&in,Points2&p){
-        in>>p.x>>p.y;
-        return in;
+    IPoint operator+(const IPoint& other) const {
+        return {x + other.x, y + other.y};
     }
-    friend std::ostream& operator<<(std::ostream&out,const Points2&p){
-        out<<'('<<p.x<<','<<p.y<<')';
-        return out;
+    IPoint operator-(const IPoint& other) const {
+        return {x - other.x, y - other.y};
     }
-    ld abs()const{return std::sqrt(x*x+y*y);}
-    ld abs2()const{return x*x+y*y;}
-    Points2 operator+(const Points2&p)const{return {x+p.x,y+p.y};}
-    Points2 operator-(const Points2&p)const{return {x-p.x,y-p.y};}
-    Points2 operator+()const{return{+x,+y};}
-    Points2 operator-()const{return{-x,-y};}
-    Points2 operator*(const ld&p)const{return {x*p,y*p};}
-    Points2 operator/(const ld&p)const{return {x/p,y/p};}
-    bool operator==(const Points2&p)const{return Eq(x,p.x)&&Eq(y,p.y);}
-};
-ld multi(const Points2&a,const Points2&b){return a.x*b.x+a.y*b.y;}
-ld cross(const Points2&a,const Points2&b){return a.x*b.y-b.x*a.y;}
-Points2 intersection(const Points2&p1, const Points2&dir1, const Points2&p2, const Points2&dir2){
-    double t=cross((p2-p1),dir2)/cross(dir1,dir2);
-    return p1+dir1*t;
-}
-
-void Andrew(std::vector<Points2> Now,std::vector<Points2>&Ans,bool flag=false){
-    if(!flag){
-        static std::function<bool(const Points2&,const Points2&)>Cmp=[](const Points2&a,const Points2&b){
-            return a.x==b.x?a.y<b.y:a.x<b.x;
-        };
-        std::sort(Now.begin(),Now.end(),Cmp);
+    bool operator==(const IPoint& other) const {
+        return x == other.x && y == other.y;
     }
-    int len=Now.size();
-    int tmp,top=0;Clear(Ans);
-    tmp=top=1;Ans.push_back(Now[0]);
-    for(int i=1;i<len;i++){
-        while(top>tmp&&Le(cross(Ans[top-1]-Ans[top-2],Now[i]-Ans[top-2]),0))
-            Ans.pop_back(),top--;
-        Ans.push_back(Now[i]);top++;
-    }
-    tmp=top;
-    for(int i=len-2;i>=0;i--){
-        while(top>tmp&&Le(cross(Ans[top-1]-Ans[top-2],Now[i]-Ans[top-2]),0))
-            Ans.pop_back(),top--;
-        Ans.push_back(Now[i]);top++;
-    }
-}
-
-ld angle(const Points2&a){//求极角
-    return atan2(a.y,a.x);
-}
-ld cosIncAngle(const Points2&a,const Points2&b){
-    return multi(a,b)/a.abs()/b.abs();
-}
-ld incAngle(const Points2&a,const Points2&b){//求夹角
-    return Acos(cosIncAngle(a,b));
-} 
-//Andrew 到这个是无缝连接的,要求凸包的斜率是递减的,得到的结果有可能共线,且头接尾
-std::vector<Points2>MinkowskiSum(std::vector<Points2>a,std::vector<Points2>b){
-    std::vector<Points2>c{a[0]+b[0]};
-    for (unsigned i=0;i+1<a.size();++i)a[i]=a[i+1]-a[i];
-    for (unsigned i=0;i+1<b.size();++i)b[i]=b[i+1]-b[i];
-    a.pop_back(),b.pop_back();
-    c.resize(a.size()+b.size()+1);
-    std::merge(a.begin(),a.end(),b.begin(),b.end(),c.begin()+1,
-        [](const Points2&a,const Points2&b){return Gt(cross(a,b),0);});
-    for (unsigned i=1;i<c.size();++i)c[i]=c[i]+c[i-1];
-    return c;
-}
-
-struct Lines{//向量左侧
-    Points2 a,b;ld ang;
-    Lines(Points2 _a=Points2(),Points2 _b=Points2()):a(_a),b(_b){
-        ang=angle(b-a);
-    }
-    Lines(ld A,ld B,ld C){//Ax+By+C>=0
-        if(Eq(A,0)){
-            a=Points2(0,-C/B),b=Points2(1,-C/B);
-            if(Lt(B,0))std::swap(a,b);
-        }
-        else if(Eq(B,0)){
-            a=Points2(-C/A,0),b=Points2(-C/A,1);
-            if(Gt(A,0))std::swap(a,b);
-        }
-        else{
-            a=Points2(0,-C/B),b=Points2(1,(-C-A)/B);
-            if(Lt(B,0))std::swap(a,b);
-        }
-        ang=angle(b-a);
+    bool operator<(const IPoint& other) const {
+        return tie(x, y) < tie(other.x, other.y);
     }
 };
-Points2 intersection(const Lines&a,const Lines&b){
-    return intersection(a.a,a.b-a.a,b.a,b.b-b.a);
-}
-bool onRight(const Lines&l,const Points2&p){//也可能在线上
-    return Le(cross(l.b-l.a,p-l.a),0);
+
+i128 dot(const IPoint& lhs, const IPoint& rhs) {
+    return (i128)lhs.x * rhs.x + (i128)lhs.y * rhs.y;
 }
 
-int getHpi(std::vector<Lines>Arr,std::deque<Lines>&Ans){//请添加边界,如果访问到边界,一定无解
-    static std::function<bool(const Lines&,const Lines&)>Cmp1=[](const Lines&a,const Lines&b){
-        return Eq(a.ang,b.ang)?onRight(a,b.a):Lt(a.ang,b.ang);
-    };
-    static std::function<bool(const Lines&,const Lines&)>Cmp2=[](const Lines&a,const Lines&b){
-        return Eq(a.ang,b.ang);
-    };
-    std::sort(Arr.begin(),Arr.end(),Cmp1);Clear(Ans);
-    Arr.erase(unique(Arr.begin(),Arr.end(),Cmp2),Arr.end());
-    
-    int siz=2;
-    Ans.push_back(Arr[0]);Ans.push_back(Arr[1]);
-    for(unsigned i=2;i<Arr.size();i++){
-        while(siz>=2&&onRight(Arr[i],intersection(Ans[siz-1],Ans[siz-2])))Ans.pop_back(),siz--;
-        while(siz>=2&&onRight(Arr[i],intersection(Ans[0],Ans[1])))Ans.pop_front(),siz--;
-        Ans.push_back(Arr[i]);siz++;
-    }
-    while(siz>=2&&onRight(Ans[0],intersection(Ans[siz-1],Ans[siz-2])))Ans.pop_back(),siz--;
-    if(siz<=2)return -1;//无解
-    return 0;//请自行检查边界
+i128 cross(const IPoint& lhs, const IPoint& rhs) {
+    return (i128)lhs.x * rhs.y - (i128)lhs.y * rhs.x;
 }
 
-struct Points3{
-    ld x,y,z;
-    Points3(){}
-    Points3(const ld&_x,const ld&_y,const ld&_z):x(_x),y(_y),z(_z){}
-    friend std::istream& operator>>(std::istream&in,Points3&p){
-        in>>p.x>>p.y>>p.z;
-        return in;
-    }
-    friend std::ostream& operator<<(std::ostream&out,const Points3&p){
-        out<<'('<<p.x<<','<<p.y<<','<<p.z<<')';
-        return out;
-    }
-    ld abs()const{return std::sqrt(x*x+y*y+z*z);}
-    ld abs2()const{return x*x+y*y+z*z;}
-    Points3 operator+(const Points3&p)const{return {x+p.x,y+p.y,z+p.z};}
-    Points3 operator-(const Points3&p)const{return {x-p.x,y-p.y,z-p.z};}
-    Points3 operator+()const{return{+x,+y,+z};}
-    Points3 operator-()const{return{-x,-y,-z};}
-    Points3 operator*(const ld&p)const{return {x*p,y*p,z*p};}
-    Points3 operator/(const ld&p)const{return {x/p,y/p,z/p};}
-    bool operator==(const Points3&p)const{return Eq(x,p.x)&&Eq(y,p.y)&&Eq(z,p.z);}
-};
-Points3 cross(const Points3&a,const Points3&b){
-    return {a.y*b.z-b.y*a.z,a.z*b.x-b.z*a.x,a.x*b.y-b.x*a.y};
+i128 cross(const IPoint& origin, const IPoint& lhs, const IPoint& rhs) {
+    return cross(lhs - origin, rhs - origin);
 }
-ld multi(const Points3&a,const Points3&b){return a.x*b.x+a.y*b.y+a.z*b.z;}
-Points3 project(const Points3&p,const Points3&a,const Points3&b){
-    Points3 v=cross(a,b);
-    return v-v*multi(v,p)/v.abs2();
-}
-ld cosIncAngle(const Points3&a,const Points3&b){return multi(a,b)/a.abs()/b.abs();}
-ld incAngle(const Points3&a,const Points3&b){//求夹角
-    return Acos(cosIncAngle(a,b));
-} 
 
-typedef Points2 Points;
+i128 norm2(const IPoint& point) {
+    return dot(point, point);
+}
 
-void Main(int Case){
-    Points a=Points(10000,10000),b=Points(-10000,10000),c=Points(-10000,-10000),d=Points(10000,-10000);
-    OutPut(std::fixed,std::setprecision(3));
-    std::vector<Lines>Arr;
-    std::deque<Lines>Ans;
-    Arr.push_back(Lines(b,a));
-    Arr.push_back(Lines(d,c));
-    getHpi(Arr,Ans);
-    OutPut(Ans.size());
+int sign(i128 value) {
+    return (value > 0) - (value < 0);
 }
-int main(){
-    #ifdef LOCAL
-    freopen("In.txt","r",stdin);
-    freopen("Out.txt","w",stdout);
-//  freopen("Err.txt","w",stderr);
-    auto beg=std::chrono::steady_clock().now();
-    #endif
-    
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);std::cout.tie(nullptr);
-    int Task=1;
-    for(int Case=1;Case<=Task;Case++){
-        Main(Case);
-    }
-    
-    #ifdef LOCAL
-    auto end=std::chrono::steady_clock().now();
-    ErrPut(std::fixed,std::chrono::duration_cast<std::chrono::duration<double>>(end - beg).count(),'\n');
-    #endif
-    return 0;
-}
+
+} // namespace geometry
 ```
+
+`cross(a, b, c)` 的符号表示从向量 $\overrightarrow{ab}$ 转到 $\overrightarrow{ac}$ 的方向：正数为逆时针，负数为顺时针，零为共线。
+
+## 跨立实验与线段相交
+
+线段 $ab$ 与直线 $cd$ 的跨立实验是比较 `cross(c, d, a)` 与 `cross(c, d, b)` 的符号。两条线段严格相交，当且仅当它们分别严格跨立对方所在直线。
+
+只用严格跨立会漏掉端点接触和共线重叠，因此完整实现必须单独处理叉积为零的情形：
+
+```cpp
+namespace geometry {
+
+bool on_segment(const IPoint& point, const IPoint& lhs, const IPoint& rhs) {
+    return cross(lhs, rhs, point) == 0 &&
+           min(lhs.x, rhs.x) <= point.x && point.x <= max(lhs.x, rhs.x) &&
+           min(lhs.y, rhs.y) <= point.y && point.y <= max(lhs.y, rhs.y);
+}
+
+enum class SegmentRelation {
+    disjoint,             // 没有公共点
+    touch,                // 恰有一个公共点，但不是两线段内部严格相交
+    proper_intersection,  // 两线段在各自内部严格相交
+    overlap               // 共线，且交集是一段非零长度线段
+};
+
+SegmentRelation segment_relation(IPoint a, IPoint b, IPoint c, IPoint d) {
+    int ab_c = sign(cross(a, b, c));
+    int ab_d = sign(cross(a, b, d));
+    int cd_a = sign(cross(c, d, a));
+    int cd_b = sign(cross(c, d, b));
+
+    if (ab_c == 0 && ab_d == 0) {
+        if (b < a) swap(a, b);
+        if (d < c) swap(c, d);
+        IPoint left = max(a, c);
+        IPoint right = min(b, d);
+        if (right < left) return SegmentRelation::disjoint;
+        if (left == right) return SegmentRelation::touch;
+        return SegmentRelation::overlap;
+    }
+
+    if (ab_c * ab_d < 0 && cd_a * cd_b < 0) {
+        return SegmentRelation::proper_intersection;
+    }
+    if ((ab_c == 0 && on_segment(c, a, b)) ||
+        (ab_d == 0 && on_segment(d, a, b)) ||
+        (cd_a == 0 && on_segment(a, c, d)) ||
+        (cd_b == 0 && on_segment(b, c, d))) {
+        return SegmentRelation::touch;
+    }
+    return SegmentRelation::disjoint;
+}
+
+} // namespace geometry
+```
+
+复杂度为 $O(1)$。如果题目只问“是否有公共点”，返回值不是 `disjoint` 即可。
+
+## 多边形面积与点包含
+
+`point_in_polygon` 适用于任意简单多边形，顶点可顺时针或逆时针给出，返回 `outside / boundary / inside`。射线经过顶点时必须使用半开区间判断，否则同一个顶点可能被统计两次。
+
+```cpp
+namespace geometry {
+
+i128 polygon_area_twice(const vector<IPoint>& polygon) {
+    i128 area = 0;
+    int size = (int)polygon.size();
+    for (int i = 0; i < size; ++i) {
+        area += cross(polygon[i], polygon[(i + 1) % size]);
+    }
+    return area;
+}
+
+enum class PointLocation {
+    outside,   // 点在多边形外部
+    boundary,  // 点在多边形边界上
+    inside     // 点在多边形内部
+};
+
+PointLocation point_in_polygon(const vector<IPoint>& polygon, const IPoint& point) {
+    bool inside = false;
+    int size = (int)polygon.size();
+    for (int i = 0; i < size; ++i) {
+        IPoint lhs = polygon[i];
+        IPoint rhs = polygon[(i + 1) % size];
+        if (on_segment(point, lhs, rhs)) return PointLocation::boundary;
+
+        bool crosses_height = (lhs.y > point.y) != (rhs.y > point.y);
+        if (!crosses_height) continue;
+        i128 direction = cross(lhs, rhs, point);
+        if ((direction > 0) == (rhs.y > lhs.y)) inside = !inside;
+    }
+    return inside ? PointLocation::inside : PointLocation::outside;
+}
+
+} // namespace geometry
+```
+
+面积的实际值是 `abs(polygon_area_twice(polygon)) / 2`。点包含单次查询复杂度为 $O(n)$。
+
+## Pick 定理与格点计数
+
+对顶点都在整点上、没有自交且没有洞的简单多边形，设面积为 $A$、内部格点数为 $I$、边界格点数为 $B$，则
+
+$$
+A=I+\frac B2-1.
+$$
+
+使用二倍面积 $A_2=2A$ 时无需浮点数：
+
+$$
+I=\frac{A_2-B+2}{2}.
+$$
+
+整数线段两端坐标差为 $(dx,dy)$ 时，线段被分成 $\gcd(|dx|,|dy|)$ 段最短格点线段。沿多边形各边累加该 gcd，端点恰好各计一次，因此
+
+$$
+B=\sum_{i=0}^{n-1}gcd(|x_{i+1}-x_i|,|y_{i+1}-y_i|).
+$$
+
+```cpp
+namespace geometry {
+
+i128 boundary_lattice_points(const vector<IPoint>& polygon) {
+    i128 boundary = 0;
+    int size = (int)polygon.size();
+    for (int i = 0; i < size; ++i) {
+        const IPoint& lhs = polygon[i];
+        const IPoint& rhs = polygon[(i + 1) % size];
+        i64 dx = llabs(rhs.x - lhs.x);
+        i64 dy = llabs(rhs.y - lhs.y);
+        boundary += gcd(dx, dy);
+    }
+    return boundary;
+}
+
+i128 interior_lattice_points(const vector<IPoint>& polygon) {
+    i128 area_twice = polygon_area_twice(polygon);
+    if (area_twice < 0) area_twice = -area_twice;
+    i128 boundary = boundary_lattice_points(polygon);
+    i128 numerator = area_twice - boundary + 2;
+    assert(polygon.size() >= 3 && area_twice > 0);
+    assert(numerator >= 0 && numerator % 2 == 0);
+    return numerator / 2;
+}
+
+} // namespace geometry
+```
+
+单条闭线段上的格点数是 `gcd(abs(dx), abs(dy)) + 1`，但按多边形边累加时不能再加 1，否则每个顶点会被重复计算。Pick 定理不能直接用于自交多边形；有 $h$ 个洞时应改为 $A=I+B/2-1+h$。

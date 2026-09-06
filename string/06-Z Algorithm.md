@@ -1,35 +1,42 @@
-# Z函数
+# Z 函数
+
+`z[i]` 是字符串与后缀 `text[i..]` 的最长公共前缀长度，约定 `z[0]=n`。
 
 ```cpp
-int main(){
-	scanf("%s",A+1);
-	la=strlen(A+1);
-	scanf("%s",B+1);
-	lb=strlen(B+1);
-	for(int i=1;i<=lb;i++)
-		C[i]=B[i];
-	for(int i=1;i<=la;i++)
-		C[i+lb]=A[i];
-	//拼接是常用的技巧 当然用 z of B 求出 z of A 也可行 
-	Zi[1]=la+lb-1;
-	for(int i=2,l=0,r=0;i<=la+lb;i++){
-		if(i<=r&&Zi[i-l+1]<=r-i)
-			Zi[i]=Zi[i-l+1];
-		else{	
-			Zi[i]=max(0,r-i);
-			while(i+Zi[i]<=la+lb&&C[Zi[i]+1]==C[i+Zi[i]])
-				Zi[i]++;
-		}
-		if(i+Zi[i]-1>r)l=i,r=i+Zi[i]-1;
-	}
-	ans=0;
-	for(int i=1;i<=lb;i++)
-		ans^=1ll*i*(min(Zi[i],lb-i+1)+1);
-	printf("%lld\n",ans);
-	ans=0;
-	for(int i=lb+1;i<=lb+la;i++)
-		ans^=1ll*(i-lb)*(min(Zi[i],lb)+1);
-	printf("%lld\n",ans);
-	return 0;
-} 
+#include <bits/stdc++.h>
+using namespace std;
+
+vector<int> z_function(const string& text) {
+    int size = (int)text.size();
+    vector<int> z(size);
+    if (size == 0) return z;
+    z[0] = size;
+    for (int index = 1, left = 0, right = 0; index < size; ++index) {
+        if (index <= right) {
+            z[index] = min(right - index + 1, z[index - left]);
+        }
+        while (index + z[index] < size &&
+               text[z[index]] == text[index + z[index]]) {
+            ++z[index];
+        }
+        if (index + z[index] - 1 > right) {
+            left = index;
+            right = index + z[index] - 1;
+        }
+    }
+    return z;
+}
 ```
+
+匹配模式串时可计算 `pattern + separator + text` 的 Z 函数；分隔符必须不出现在两串中。复杂度为 $O(n)$。
+
+## 常见推论
+
+设字符串长度为 $n$：
+
+- 长度 $b$ 是 border，当且仅当 `z[n - b] >= b`；由于该后缀只有 $b$ 个字符，这里实际上必有等号。
+- $p$ 是周期，当且仅当 `z[p] >= n - p`。从小到大找第一个满足者即可得到最小位移周期。
+- 长度为 $length$ 的前缀在位置 `i` 出现，当且仅当 `z[i] >= length`；把所有 Z 值排序、做桶计数或离线查询，就能同时回答很多前缀出现次数。
+- `i + z[i] == n` 的位置恰好对应一个 border，其长度为 `z[i]`。
+
+KMP 更方便沿 border 链跳转并建立失配树；Z 函数更方便判断某个指定位置与整串前缀能匹配多长。周期问题中两者等价，选择能让后续统计更直接的一种即可。

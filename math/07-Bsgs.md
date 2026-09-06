@@ -1,61 +1,105 @@
-# Bsgs
+# BSGS 与扩展 BSGS
+
+求最小非负整数 $x$ 使 $a^x\equiv b\pmod m$。扩展版本允许 $\gcd(a,m)\ne1$，无解返回 -1。下面实现约定 $1\le m\le 2^{63}-1$。
 
 ```cpp
-#include<cstdio>
-#include<cstring>
-#include<algorithm>
-#include<map>
-#include<cmath>
+#include <bits/stdc++.h>
+#include <cassert>
 using namespace std;
 
-inline int Gcd(int a,int b){
-	return b==0?a:Gcd(b,a%b);
-}
-inline void ExGcd(int a,int b,int &x,int &y){
-	if(b==0){x=1,y=0;return ;}
-	ExGcd(b,a%b,y,x);y-=(a/b)*x;
-}
-inline int GetInv(int a,int p){
-	int x,y;ExGcd(a,p,x,y);
-	return (x%p+p)%p;
+namespace discrete_logarithm {
+
+using i64 = long long;
+using i128 = __int128_t;
+
+i64 multiply_mod(i64 lhs, i64 rhs, i64 modulus) {
+    return (i64)((i128)lhs * rhs % modulus);
 }
 
-map<int,int>H;
-inline int Bsgs(int a,int b,int p){
-	if(1%p==b%p)return 0;
-	a%=p,b%=p;
-	H.clear();
-	int k=ceill(sqrtl(p)),r=1;
-	for(int t=0;t<k;t++){
-		H[1ll*b*r%p]=t;
-		r=1ll*r*a%p;
-	}
-	int ak=r;
-	for(int t=1;t<=k;t++){
-		auto q=H.find(r);
-		if(q!=H.end())return 1ll*t*k-(*q).second;
-		r=1ll*r*ak%p;
-	}
-	return -1;
+i64 power_mod(i64 base, i64 exponent, i64 modulus) {
+    i64 result = 1 % modulus;
+    while (exponent > 0) {
+        if (exponent & 1) result = multiply_mod(result, base, modulus);
+        base = multiply_mod(base, base, modulus);
+        exponent >>= 1;
+    }
+    return result;
 }
-inline int ExBsgs(int a,int b,int p){
-	if(1%p==b%p)return 0;
-	a%=p;b%=p;
-	int g=Gcd(a,p);
-	if(g!=1){
-		if(b%g!=0)return -1;
-		int t=ExBsgs(a,1ll*(b/g)*GetInv(a/g,p/g)%(p/g),(p/g));
-		return t==-1?-1:t+1;
-	}
-	return Bsgs(a,b,p);
+
+i64 extended_gcd(i64 lhs, i64 rhs, i64& lhs_coefficient,
+                 i64& rhs_coefficient) {
+    if (rhs == 0) {
+        lhs_coefficient = 1;
+        rhs_coefficient = 0;
+        return lhs;
+    }
+    i64 next_lhs = 0;
+    i64 next_rhs = 0;
+    i64 divisor = extended_gcd(rhs, lhs % rhs, next_lhs, next_rhs);
+    lhs_coefficient = next_rhs;
+    rhs_coefficient = next_lhs - lhs / rhs * next_rhs;
+    return divisor;
 }
-int a,b,p;
-int main(){
-	while(~scanf("%d%d%d",&a,&p,&b)&&!(a==0&&b==0&&p==0)){
-		int t=ExBsgs(a,b,p);
-		if(t==-1)puts("No Solution");
-		else printf("%d\n",t);
-	}
-	return 0;
+
+i64 modular_inverse(i64 value, i64 modulus) {
+    i64 coefficient = 0;
+    i64 ignored = 0;
+    i64 divisor = extended_gcd(value, modulus, coefficient, ignored);
+    assert(divisor == 1);
+    coefficient %= modulus;
+    if (coefficient < 0) coefficient += modulus;
+    return coefficient;
 }
+
+i64 bsgs_coprime(i64 base, i64 target, i64 modulus) {
+    i64 block = (i64)ceill(sqrtl((long double)modulus));
+    unordered_map<i64, i64> baby_step;
+    baby_step.reserve((size_t)block * 2 + 1);
+    i64 current = 1 % modulus;
+    for (i64 exponent = 0; exponent < block; ++exponent) {
+        baby_step.emplace(current, exponent);
+        current = multiply_mod(current, base, modulus);
+    }
+
+    i64 inverse_block =
+        modular_inverse(power_mod(base, block, modulus), modulus);
+    current = target;
+    for (i64 block_id = 0; block_id <= block; ++block_id) {
+        auto found = baby_step.find(current);
+        if (found != baby_step.end()) {
+            return block_id * block + found->second;
+        }
+        current = multiply_mod(current, inverse_block, modulus);
+    }
+    return -1;
+}
+
+i64 extended_bsgs(i64 base, i64 target, i64 modulus) {
+    assert(modulus >= 1);
+    base %= modulus;
+    target %= modulus;
+    if (modulus == 1 || target == 1 % modulus) return 0;
+
+    i64 removed_steps = 0;
+    i64 accumulated = 1 % modulus;
+    while (true) {
+        i64 divisor = gcd(base, modulus);
+        if (divisor == 1) break;
+        if (target == accumulated) return removed_steps;
+        if (target % divisor != 0) return -1;
+        target /= divisor;
+        modulus /= divisor;
+        accumulated = multiply_mod(accumulated, base / divisor, modulus);
+        ++removed_steps;
+    }
+
+    target = multiply_mod(target, modular_inverse(accumulated, modulus),
+                          modulus);
+    i64 remaining = bsgs_coprime(base % modulus, target, modulus);
+    return remaining == -1 ? -1 : removed_steps + remaining;
+}
+
+} // namespace discrete_logarithm
 ```
+
+时间和空间复杂度均为 $O(\sqrt m)$。哈希表可能被构造数据攻击；需要更稳定常数时可把 baby step 存入数组后排序，用二分查找代替 `unordered_map`。

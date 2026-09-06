@@ -1,1 +1,3 @@
-~/Desktop/Package/Msys2/usr/bin/python3
+E:\\Msys2\\usr\\bin\\python3.exe .\\makeup.py
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\verify_core.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\verify_core.ps1 -Sanitize

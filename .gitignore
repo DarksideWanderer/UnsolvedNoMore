@@ -7,5 +7,5 @@ _minted/
 .DS_Store
 *.tex
 *.toc
-tester/
+tester/*.exe
 .vscode/

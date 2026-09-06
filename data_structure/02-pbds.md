@@ -1,76 +1,72 @@
-# 二叉搜索树
+# PBDS 有序集合
+
+GNU PBDS 的 `tree` 支持排名和第 $k$ 小，接口不是标准 C++，只能在提供 libstdc++ PBDS 的评测环境使用。
 
 ```cpp
-template<typename T>
-struct ChxSet{
-        typedef __gnu_pbds::tree<T,__gnu_pbds::null_type,std::less<T>,__gnu_pbds::rb_tree_tag,__gnu_pbds::tree_order_statistics_node_update> Type;
-        Type S;
-        void insert(T x){S.insert(x);}
-        bool have(T x){return S.find(x)!=S.end();}
-        bool erase(T x){return S.erase(x);}
-        typename Type::iterator find(T x){return S.find(x);}
-        typename Type::iterator erase(typename Type::iterator it){return S.erase(it);}
-        int getrank(T x){return S.order_of_key(x);}//返回严格小于 x 的元素个数(以 Cmp_Fn 作为比较逻辑),即从 0 开始的排名
-        typename Type::iterator select(int x){return S.find_by_order(x);}//返回 Cmp_Fn 比较的排名所对应元素的迭代器
-        typename Type::iterator prev(T x){//<x 严格前驱
-                int t=S.order_of_key(x);
-                if(t==0)return S.end();
-                else return S.find_by_order(x-1);
-        }
-        typename Type::iterator succ(T x){//>x 严格后继
-                return S.upper_bound(x);
-        }
-        typename Type::iterator lower_bound(T x){return S.lower_bound(x);}
-        typename Type::iterator upper_bound(T x){return S.upper_bound(x);}
-        typename Type::iterator begin(){return S.begin();}
-        typename Type::iterator end(){return S.end();}
-        bool empty(){return S.empty();}
-        size_t size(){return S.size();}
-        
-};
+#include <bits/stdc++.h>
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/tree_policy.hpp>
+using namespace std;
+using namespace __gnu_pbds;
 
-template<typename T,int MaxN>//MaxN:总共入队次数
-struct ChxMultiSet{
-        typedef __gnu_pbds::tree<std::pair<T,int>,__gnu_pbds::null_type,std::less<std::pair<T,int>>,__gnu_pbds::rb_tree_tag,__gnu_pbds::tree_order_statistics_node_update> Type;
-        Type S;
-        int index;
-        void insert(T x){index++;S.insert({x,index});}
-        bool have(T x) {
-                int rank = S.order_of_key({x, 0});
-                if (rank >= static_cast<int>(S.size())) return false;
-                auto it = S.find_by_order(rank);
-                return it!=S.end()&&it->first == x;
-        }
-        typename Type::iterator find(T x){
-                int rank = S.order_of_key({x, 0});
-                if (rank >= static_cast<int>(S.size())) return S.end();
-                auto it = S.find_by_order(rank);
-                if(it==S.end()||(*it).first!=x)return S.end();
-                return it;
-        }
-        bool erase(T x){
-                auto p=find(x);
-                if(p!=S.end()){
-                        S.erase(p);return true;
-                }
-                return false;
-        }
-        typename Type::iterator erase(typename Type::iterator it){return S.erase(it);}
-        int getrank(T x){return S.order_of_key({x,0});}//返回严格小于 x 的元素个数(以 Cmp_Fn 作为比较逻辑),即从 0 开始的排名
-        typename Type::iterator select(int x){return S.find_by_order(x);}//返回 Cmp_Fn 比较的排名所对应元素的迭代器
-        typename Type::iterator prev(T x){//<x 严格前驱
-                int t=S.order_of_key({x,0});
-                if(t==0)return S.end();
-                else return select(t-1);
-        }
-        typename Type::iterator succ(T x){//>x 严格后继
-                return S.upper_bound({x,MaxN});
-        }
-        typename Type::iterator lower_bound(T x){return S.lower_bound({x,0});}
-        typename Type::iterator upper_bound(T x){return S.upper_bound({x,MaxN});}
-        typename Type::iterator begin(){return S.begin();}
-        typename Type::iterator end(){return S.end();}
-        bool empty(){return S.empty();}
-        size_t size(){return S.size();}
+template<class Value>
+using OrderedSet = tree<
+    Value, null_type, less<Value>, rb_tree_tag,
+    tree_order_statistics_node_update>;
+
+template<class Value>
+class OrderedMultiSet {
+    using Key = pair<Value, int>;
+    tree<Key, null_type, less<Key>, rb_tree_tag,
+         tree_order_statistics_node_update> data;
+    int next_id = 0;
+
+public:
+    void insert(const Value& value) {
+        data.insert({value, next_id++});
+    }
+
+    bool erase_one(const Value& value) {
+        auto iterator = data.lower_bound({value, numeric_limits<int>::min()});
+        if (iterator == data.end() || iterator->first != value) return false;
+        data.erase(iterator);
+        return true;
+    }
+
+    int count_less(const Value& value) const {
+        return (int)data.order_of_key(
+            {value, numeric_limits<int>::min()});
+    }
+
+    int count_less_equal(const Value& value) const {
+        return (int)data.order_of_key(
+            {value, numeric_limits<int>::max()});
+    }
+
+    optional<Value> kth(int rank) const {
+        if (rank < 0 || rank >= (int)data.size()) return nullopt;
+        return data.find_by_order(rank)->first;
+    }
+
+    optional<Value> predecessor(const Value& value) const {
+        int rank = count_less(value);
+        return rank == 0 ? nullopt : kth(rank - 1);
+    }
+
+    optional<Value> successor(const Value& value) const {
+        int rank = count_less_equal(value);
+        return rank == (int)data.size() ? nullopt : kth(rank);
+    }
+
+    int size() const {
+        return (int)data.size();
+    }
 };
 ```
+
+对于 `OrderedSet<int> values`：
+
+- `values.order_of_key(x)` 是严格小于 $x$ 的元素个数；
+- `values.find_by_order(k)` 返回 0-based 第 $k$ 小的迭代器，越界时等于 `end()`。
+
+多重集合通过唯一编号区分相同值。编号只递增不复用；若插入次数可能超过 `int`，把编号改为 `long long`。

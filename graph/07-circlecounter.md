@@ -1,78 +1,78 @@
-# Count Circle Number
+# 三元环与四元环计数
+
+以下算法要求输入是无自环、无重边的简单无向图。按“度数优先、编号次优先”给点定全序，把每条边从较大的端点定向到较小的端点。
 
 ```cpp
-#include <iostream>
+#include <bits/stdc++.h>
 using namespace std;
 
-int n, m, total;
-int deg[200001], u[200001], v[200001];
-bool vis[200001];
+using i64 = long long;
 
-struct Edge {
-  int to, nxt;
-} edge[200001];
-
-int cntEdge, head[100001];
-
-void addEdge(int u, int v) {
-  edge[++cntEdge] = {v, head[u]}, head[u] = cntEdge;
-}
-
-int main() {
-  cin.tie(nullptr)->sync_with_stdio(false);
-  cin >> n >> m;
-  for (int i = 1; i <= m; i++) cin >> u[i] >> v[i], deg[u[i]]++, deg[v[i]]++;
-  for (int i = 1; i <= m; i++) {
-    if ((deg[u[i]] == deg[v[i]] && u[i] > v[i]) || deg[u[i]] < deg[v[i]])
-      swap(u[i], v[i]);
-    addEdge(u[i], v[i]);
-  }
-  for (int u = 1; u <= n; u++) {
-    for (int i = head[u]; i; i = edge[i].nxt) vis[edge[i].to] = true;
-    for (int i = head[u]; i; i = edge[i].nxt) {
-      int v = edge[i].to;
-      for (int j = head[v]; j; j = edge[j].nxt) {
-        int w = edge[j].to;
-        if (vis[w]) total++;
-      }
+i64 count_triangles(int node_count,
+                    const vector<pair<int, int>>& edges) {
+    vector<int> degree(node_count);
+    for (auto [lhs, rhs] : edges) {
+        ++degree[lhs];
+        ++degree[rhs];
     }
-    for (int i = head[u]; i; i = edge[i].nxt) vis[edge[i].to] = false;
-  }
-  cout << total << '\n';
-  return 0;
+    auto larger = [&](int lhs, int rhs) {
+        return pair{degree[lhs], lhs} > pair{degree[rhs], rhs};
+    };
+    vector<vector<int>> outgoing(node_count);
+    for (auto [lhs, rhs] : edges) {
+        if (!larger(lhs, rhs)) swap(lhs, rhs);
+        outgoing[lhs].push_back(rhs);
+    }
+
+    vector<bool> marked(node_count);
+    i64 answer = 0;
+    for (int largest = 0; largest < node_count; ++largest) {
+        for (int next : outgoing[largest]) marked[next] = true;
+        for (int middle : outgoing[largest]) {
+            for (int smallest : outgoing[middle]) {
+                answer += marked[smallest];
+            }
+        }
+        for (int next : outgoing[largest]) marked[next] = false;
+    }
+    return answer;
+}
+
+i64 count_four_cycles(int node_count,
+                      const vector<pair<int, int>>& edges) {
+    vector<int> degree(node_count);
+    vector<vector<int>> graph(node_count);
+    for (auto [lhs, rhs] : edges) {
+        ++degree[lhs];
+        ++degree[rhs];
+        graph[lhs].push_back(rhs);
+        graph[rhs].push_back(lhs);
+    }
+    auto order = [&](int node) {
+        return pair{degree[node], node};
+    };
+    vector<vector<int>> outgoing(node_count);
+    for (auto [lhs, rhs] : edges) {
+        if (order(lhs) < order(rhs)) swap(lhs, rhs);
+        outgoing[lhs].push_back(rhs);
+    }
+
+    vector<int> path_count(node_count);
+    vector<int> touched;
+    i64 answer = 0;
+    for (int largest = 0; largest < node_count; ++largest) {
+        for (int middle : outgoing[largest]) {
+            for (int opposite : graph[middle]) {
+                if (order(opposite) >= order(largest)) continue;
+                if (path_count[opposite] == 0) touched.push_back(opposite);
+                answer += path_count[opposite]++;
+            }
+        }
+        for (int node : touched) path_count[node] = 0;
+        touched.clear();
+    }
+    return answer;
 }
 ```
 
-```cpp
-#include <iostream>
-#include <vector>
-using namespace std;
-int n, m, deg[100001], cnt[100001];
-vector<int> E[100001], E1[100001];
-long long total;
-int main() {
-  cin.tie(nullptr)->sync_with_stdio(false);
-  cin >> n >> m;
-  for (int i = 1; i <= m; i++) {
-    int u, v;
-    cin >> u >> v;
-    E[u].push_back(v);
-    E[v].push_back(u);
-    deg[u]++, deg[v]++;
-  }
-  for (int u = 1; u <= n; u++)
-    for (int v : E[u])
-      if (deg[u] > deg[v] || (deg[u] == deg[v] && u > v)) E1[u].push_back(v);
-  for (int a = 1; a <= n; a++) {
-    for (int b : E1[a])
-      for (int c : E[b]) {
-        if (deg[a] < deg[c] || (deg[a] == deg[c] && a <= c)) continue;
-        total += cnt[c]++;
-      }
-    for (int b : E1[a])
-      for (int c : E[b]) cnt[c] = 0;
-  }
-  cout << total << '\n';
-  return 0;
-}
-```
+三元环和四元环算法均利用低度定向把枚举量压到 $O(m\sqrt m)$。四元环按顶点集合计数；即使同一组四个点还有对角线，也仍只按其中实际存在的四边环计数。
