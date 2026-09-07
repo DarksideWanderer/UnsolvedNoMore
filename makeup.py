@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Merge each template category and build its PDF with Pandoc."""
+"""Merge template categories and build their PDFs with Pandoc."""
 
 from __future__ import annotations
 
+import argparse
 import re
 import shutil
 import subprocess
@@ -23,9 +24,8 @@ def find_executable(name: str, common_paths: list[Path]) -> str:
         if path.is_file():
             return str(path)
     searched = ", ".join(str(path) for path in common_paths)
-    raise FileNotFoundError(
-        f"找不到 {name}。请把它加入 PATH，或安装到以下位置之一：{searched}"
-    )
+    suffix = f"：{searched}" if searched else ""
+    raise FileNotFoundError(f"找不到 {name}。请将它加入 PATH，或安装到常见位置{suffix}")
 
 
 def natural_key(path: Path) -> tuple[int, str]:
@@ -87,7 +87,7 @@ def build_pdf(folder: Path, pandoc: str) -> None:
 
 
 def template_folders() -> list[Path]:
-    """Only include non-hidden directories that directly contain Markdown."""
+    """Return non-hidden directories that directly contain Markdown."""
     return sorted(
         folder
         for folder in base_dir.iterdir()
@@ -98,8 +98,40 @@ def template_folders() -> list[Path]:
     )
 
 
-def main() -> int:
+def selected_folders(categories: list[str]) -> list[Path]:
+    """Resolve requested category names, or return every category if omitted."""
+    if not categories:
+        return template_folders()
+
+    folders: list[Path] = []
+    for category in categories:
+        folder = base_dir / category
+        if (
+            Path(category).name != category
+            or category.startswith(".")
+            or not folder.is_dir()
+            or not any(folder.glob("*.md"))
+        ):
+            raise ValueError(f"无效的模板目录：{category}")
+        folders.append(folder)
+    return folders
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="合并模板目录中的 Markdown 并生成 PDF。")
+    parser.add_argument(
+        "categories",
+        nargs="*",
+        metavar="CATEGORY",
+        help="只构建指定目录（如 adder）；省略时构建全部目录。",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     try:
+        folders = selected_folders(args.categories)
         pandoc = find_executable(
             "pandoc",
             [
@@ -109,12 +141,18 @@ def main() -> int:
         )
         find_executable("xelatex", [])
         output_dir.mkdir(exist_ok=True)
-        for folder in template_folders():
+        for folder in folders:
             build_pdf(folder, pandoc)
-    except (FileNotFoundError, UnicodeDecodeError, subprocess.CalledProcessError) as error:
+    except (
+        FileNotFoundError,
+        UnicodeDecodeError,
+        subprocess.CalledProcessError,
+        ValueError,
+    ) as error:
         print(f"构建失败：{error}", file=sys.stderr)
         return 1
-    print("全部 PDF 生成完成。")
+    names = ", ".join(folder.name for folder in folders)
+    print(f"PDF 生成完成：{names}")
     return 0
 
 

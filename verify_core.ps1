@@ -1,7 +1,8 @@
 param(
     [switch]$KeepExecutables,
     [switch]$Sanitize,
-    [string]$Cxx = "g++"
+    [string]$Cxx = "g++",
+    [string]$Only = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -49,6 +50,9 @@ function Get-CppBlocks {
 
 function Invoke-CppTest {
     param([string]$Name, [string[]]$Paths, [string]$TestCode)
+    if ($Only -and $Name -ne $Only) {
+        return
+    }
     $executable = Join-Path ([IO.Path]::GetTempPath()) (
         "template-" + $Name + "-" + $PID + ".exe"
     )
@@ -545,6 +549,109 @@ int main() {
 '@
 
 $matchingTest = @'
+// Enumerate all matchings by left vertex and count each edge in optimal ones.
+// Parallel edges have distinct IDs in this independent brute-force oracle.
+void check_bipartite(int left_size, int right_size,
+                     const vector<pair<int, int>>& edges) {
+    HopcroftKarp matching(left_size, right_size);
+    vector<vector<int>> incident(left_size);
+    for (int id = 0; id < (int)edges.size(); ++id) {
+        auto [left, right] = edges[id];
+        matching.add_edge(left, right);
+        incident[left].push_back(id);
+    }
+    int best = -1;
+    long long ways = 0;
+    vector<long long> edge_ways(edges.size());
+    vector<int> chosen;
+    auto enumerate = [&](auto&& self, int left, int used_right) -> void {
+        if (left == left_size) {
+            int size = (int)chosen.size();
+            if (size < best) return;
+            if (size > best) {
+                best = size;
+                ways = 0;
+                fill(edge_ways.begin(), edge_ways.end(), 0);
+            }
+            ++ways;
+            for (int id : chosen) ++edge_ways[id];
+            return;
+        }
+        self(self, left + 1, used_right);
+        for (int id : incident[left]) {
+            int right = edges[id].second;
+            if (used_right >> right & 1) continue;
+            chosen.push_back(id);
+            self(self, left + 1, used_right | (1 << right));
+            chosen.pop_back();
+        }
+    };
+    enumerate(enumerate, 0, 0);
+    assert(matching.max_matching() == best);
+    int actual_size = 0;
+    for (int left = 0; left < left_size; ++left) {
+        int right = matching.match_left[left];
+        if (right == -1) continue;
+        assert(0 <= right && right < right_size);
+        assert(matching.match_right[right] == left);
+        assert(find(edges.begin(), edges.end(), make_pair(left, right)) !=
+               edges.end());
+        ++actual_size;
+    }
+    assert(actual_size == best);
+    for (int right = 0; right < right_size; ++right) {
+        int left = matching.match_right[right];
+        if (left != -1) assert(matching.match_left[left] == right);
+    }
+    auto types = classify_maximum_matching_edges(
+        left_size, right_size, edges, matching.match_left, matching.match_right);
+    for (int id = 0; id < (int)edges.size(); ++id) {
+        MatchingEdgeType expected = edge_ways[id] == 0
+            ? MatchingEdgeType::impossible
+            : edge_ways[id] == ways ? MatchingEdgeType::mandatory
+                                    : MatchingEdgeType::feasible;
+        assert(types[id] == expected);
+    }
+}
+
+void check_antichain(const vector<vector<int>>& dag) {
+    int size = (int)dag.size();
+    vector<vector<bool>> reachable(size, vector<bool>(size));
+    for (int from = 0; from < size; ++from) {
+        for (int to : dag[from]) reachable[from][to] = true;
+    }
+    for (int middle = 0; middle < size; ++middle) {
+        for (int from = 0; from < size; ++from) {
+            for (int to = 0; to < size; ++to) {
+                reachable[from][to] = reachable[from][to] ||
+                    (reachable[from][middle] && reachable[middle][to]);
+            }
+        }
+    }
+    auto independent = [&](int mask) {
+        for (int lhs = 0; lhs < size; ++lhs) {
+            for (int rhs = lhs + 1; rhs < size; ++rhs) {
+                if ((mask >> lhs & 1) && (mask >> rhs & 1) &&
+                    (reachable[lhs][rhs] || reachable[rhs][lhs])) return false;
+            }
+        }
+        return true;
+    };
+    int best = 0;
+    for (int mask = 0; mask < (1 << size); ++mask) {
+        if (independent(mask)) best = max(best, popcount((unsigned)mask));
+    }
+    auto answer = maximum_antichain(dag);
+    int mask = 0;
+    for (int vertex : answer) {
+        assert(0 <= vertex && vertex < size);
+        assert(!(mask >> vertex & 1));
+        mask |= 1 << vertex;
+    }
+    assert(independent(mask));
+    assert((int)answer.size() == best);
+}
+
 int brute_matching(const vector<vector<bool>>& graph, int used,
                    vector<int>& memo) {
     int size = (int)graph.size();
@@ -564,6 +671,68 @@ int brute_matching(const vector<vector<bool>>& graph, int used,
 
 int main() {
     mt19937 random_engine(114514);
+    // All simple bipartite graphs with up to 3 vertices on each side.
+    for (int left_size = 0; left_size <= 3; ++left_size) {
+        for (int right_size = 0; right_size <= 3; ++right_size) {
+            for (int mask = 0; mask < (1 << (left_size * right_size)); ++mask) {
+                vector<pair<int, int>> edges;
+                for (int left = 0; left < left_size; ++left) {
+                    for (int right = 0; right < right_size; ++right) {
+                        if (mask >> (left * right_size + right) & 1) {
+                            edges.push_back({left, right});
+                        }
+                    }
+                }
+                check_bipartite(left_size, right_size, edges);
+            }
+        }
+    }
+    for (int test = 0; test < 1000; ++test) {
+        int left_size = 1 + (int)(random_engine() % 5);
+        int right_size = 1 + (int)(random_engine() % 5);
+        vector<pair<int, int>> edges;
+        int edge_count = (int)(random_engine() % 20);
+        for (int id = 0; id < edge_count; ++id) {
+            edges.push_back({(int)(random_engine() % (unsigned)left_size),
+                             (int)(random_engine() % (unsigned)right_size)});
+        }
+        check_bipartite(left_size, right_size, edges);
+    }
+    // All DAGs with a fixed topological order and up to 5 vertices.
+    for (int size = 0; size <= 5; ++size) {
+        vector<pair<int, int>> possible;
+        for (int lhs = 0; lhs < size; ++lhs) {
+            for (int rhs = lhs + 1; rhs < size; ++rhs) {
+                possible.push_back({lhs, rhs});
+            }
+        }
+        for (int mask = 0; mask < (1 << (int)possible.size()); ++mask) {
+            vector<vector<int>> dag(size);
+            for (int id = 0; id < (int)possible.size(); ++id) {
+                if (mask >> id & 1) {
+                    auto [lhs, rhs] = possible[id];
+                    dag[lhs].push_back(rhs);
+                }
+            }
+            check_antichain(dag);
+        }
+    }
+    for (int test = 0; test < 500; ++test) {
+        int size = (int)(random_engine() % 11);
+        vector<int> order(size);
+        iota(order.begin(), order.end(), 0);
+        shuffle(order.begin(), order.end(), random_engine);
+        vector<vector<int>> dag(size);
+        for (int lhs = 0; lhs < size; ++lhs) {
+            for (int rhs = lhs + 1; rhs < size; ++rhs) {
+                if (random_engine() % 3 == 0) {
+                    dag[order[lhs]].push_back(order[rhs]);
+                }
+            }
+        }
+        check_antichain(dag);
+    }
+    assert(GeneralMatching(0).max_matching() == 0);
     for (int test = 0; test < 1000; ++test) {
         int size = 1 + (int)(random_engine() % 10);
         vector<vector<bool>> graph(size, vector<bool>(size));
@@ -573,15 +742,27 @@ int main() {
                 if (random_engine() % 3 == 0) {
                     graph[lhs][rhs] = graph[rhs][lhs] = true;
                     matching.add_edge(lhs, rhs);
+                    if (random_engine() % 3 == 0) matching.add_edge(lhs, rhs);
                 }
             }
         }
         vector<int> memo(1 << size, -1);
-        assert(matching.max_matching() == brute_matching(graph, 0, memo));
+        int actual = matching.max_matching();
+        assert(actual == brute_matching(graph, 0, memo));
+        int matched_vertices = 0;
+        for (int vertex = 0; vertex < size; ++vertex) {
+            int partner = matching.match[vertex];
+            if (partner == -1) continue;
+            assert(0 <= partner && partner < size && partner != vertex);
+            assert(graph[vertex][partner]);
+            assert(matching.match[partner] == vertex);
+            ++matched_vertices;
+        }
+        assert(matched_vertices == 2 * actual);
     }
 
     for (int test = 0; test < 300; ++test) {
-        int left_size = 1 + (int)(random_engine() % 7);
+        int left_size = (int)(random_engine() % 8);
         int right_size = left_size + (int)(random_engine() % 3);
         vector<vector<long long>> weight(
             left_size, vector<long long>(right_size));
@@ -602,7 +783,18 @@ int main() {
             }
             expected = max(expected, current);
         } while (next_permutation(columns.begin(), columns.end()));
-        assert(matching.solve().first == expected);
+        auto [actual_weight, assignment] = matching.solve();
+        assert(actual_weight == expected);
+        assert((int)assignment.size() == left_size);
+        vector<bool> used(right_size);
+        long long assignment_weight = 0;
+        for (int left = 0; left < left_size; ++left) {
+            int right = assignment[left];
+            assert(0 <= right && right < right_size && !used[right]);
+            used[right] = true;
+            assignment_weight += weight[left][right];
+        }
+        assert(assignment_weight == actual_weight);
     }
 }
 '@
@@ -922,6 +1114,129 @@ int main() {
                     text.compare(begin, patterns[id].size(), patterns[id]) == 0;
             }
             assert(counts[terminals[id]] == expected);
+        }
+    }
+}
+'@
+
+$suffixApplicationsTest = @'
+int brute_lcp(const string& text, int lhs, int rhs) {
+    int result = 0;
+    while (lhs + result < (int)text.size() &&
+           rhs + result < (int)text.size() &&
+           text[lhs + result] == text[rhs + result]) {
+        ++result;
+    }
+    return result;
+}
+
+int sign_of(int value) {
+    return (value > 0) - (value < 0);
+}
+
+int main() {
+    mt19937 random_engine(20260907);
+    for (int test = 0; test < 500; ++test) {
+        int size = 1 + (int)(random_engine() % 16);
+        string text(size, 'a');
+        for (char& character : text) {
+            character = char('a' + random_engine() % 3);
+        }
+
+        SuffixArrayApplications sa_queries(text);
+        for (int lhs = 0; lhs < size; ++lhs) {
+            for (int rhs = 0; rhs < size; ++rhs) {
+                assert(sa_queries.suffix_lcp(lhs, rhs) ==
+                       brute_lcp(text, lhs, rhs));
+            }
+        }
+
+        vector<SuffixArraySubstring> substrings;
+        for (int start = 0; start <= size; ++start) {
+            for (int length = 0; start + length <= size; ++length) {
+                substrings.push_back({start, length});
+            }
+        }
+        for (SuffixArraySubstring lhs : substrings) {
+            string lhs_text = text.substr(lhs.start, lhs.length);
+            for (SuffixArraySubstring rhs : substrings) {
+                string rhs_text = text.substr(rhs.start, rhs.length);
+                assert(sa_queries.equal(lhs, rhs) ==
+                       (lhs_text == rhs_text));
+                assert(sa_queries.compare(lhs, rhs) ==
+                       sign_of(lhs_text.compare(rhs_text)));
+            }
+        }
+
+        vector<long long> start_weight(size);
+        for (int start = 0; start < size; ++start) {
+            start_weight[start] = (long long)(random_engine() % 11) - 5;
+            sa_queries.add_start_weight(start, start_weight[start]);
+        }
+        for (int start = 0; start < size; ++start) {
+            for (int length = 1; start + length <= size; ++length) {
+                SuffixArraySubstring pattern{start, length};
+                auto [left, right] = sa_queries.matching_interval(pattern);
+                int expected_count = 0;
+                long long expected_weight = 0;
+                for (int candidate = 0;
+                     candidate + length <= size; ++candidate) {
+                    if (text.compare(candidate, length, text,
+                                     start, length) == 0) {
+                        ++expected_count;
+                        expected_weight += start_weight[candidate];
+                        int rank = sa_queries.rank()[candidate];
+                        assert(left <= rank && rank <= right);
+                    }
+                }
+                assert(sa_queries.static_occurrence_count(pattern) ==
+                       expected_count);
+                assert(right - left + 1 == expected_count);
+                assert(sa_queries.matching_weight(pattern) ==
+                       expected_weight);
+            }
+        }
+
+        SuffixAutomatonApplications sam_queries(text);
+        vector<long long> end_weight(size);
+        for (int end = 0; end < size; ++end) {
+            end_weight[end] = (long long)(random_engine() % 11) - 5;
+            sam_queries.add_end_weight(end, end_weight[end]);
+        }
+
+        struct EndSubstring {
+            int end;
+            int length;
+            string value;
+        };
+        vector<EndSubstring> end_substrings;
+        for (int end = 0; end < size; ++end) {
+            for (int length = 1; length <= end + 1; ++length) {
+                string value = text.substr(end - length + 1, length);
+                end_substrings.push_back({end, length, value});
+
+                long long expected_weight = 0;
+                for (int candidate_end = length - 1;
+                     candidate_end < size; ++candidate_end) {
+                    if (text.compare(candidate_end - length + 1,
+                                     length, value) == 0) {
+                        expected_weight += end_weight[candidate_end];
+                    }
+                }
+                assert(sam_queries.substring_endpos_weight(end, length) ==
+                       expected_weight);
+            }
+        }
+        for (const EndSubstring& lhs : end_substrings) {
+            for (const EndSubstring& rhs : end_substrings) {
+                assert(sam_queries.equal(
+                           lhs.end, lhs.length, rhs.end, rhs.length) ==
+                       (lhs.value == rhs.value));
+                bool same_key =
+                    sam_queries.substring_key(lhs.end, lhs.length) ==
+                    sam_queries.substring_key(rhs.end, rhs.length);
+                assert(same_key == (lhs.value == rhs.value));
+            }
         }
     }
 }
@@ -3252,7 +3567,10 @@ Invoke-CppTest "discrete-log" @("math/07-Bsgs.md") $discreteLogTest
 Invoke-CppTest "tarjan" @("graph/02-tarjan.md") $tarjanTest
 Invoke-CppTest "max-flow" @("graph/03-maxflow.md") $flowTest
 Invoke-CppTest "min-cost-flow" @("graph/04-mincostmaxflow.md") $minCostFlowTest
-Invoke-CppTest "matching" @("graph/06-match.md") $matchingTest
+Invoke-CppTest "matching" @(
+    "graph/02-tarjan.md",
+    "graph/06-match.md"
+) $matchingTest
 Invoke-CppTest "link-cut-tree" @("data_structure/04-*.md") $dynamicTreeTest
 Invoke-CppTest "li-chao-tree" @("data_structure/07-*.md") $liChaoTest
 Invoke-CppTest "string-basics" @(
@@ -3272,6 +3590,13 @@ Invoke-CppTest "string-automata" @(
     "string/02-ACam.md",
     "string/03-Pam.md"
 ) $automataTest
+Invoke-CppTest "suffix-applications" @(
+    "string/08-Sa.md",
+    "string/01-Sam.md",
+    "adder/00-range-query.md",
+    "adder/01-sa-applications.md",
+    "adder/02-sam-applications.md"
+) $suffixApplicationsTest
 Invoke-CppTest "generalized-sam" @("string/11-generalized-sam.md") $generalizedSamTest
 Invoke-CppTest "mergeable-structures" @(
     "data_structure/01-*.md",

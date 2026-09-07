@@ -229,7 +229,7 @@ vector<int> maximum_antichain(const vector<vector<int>>& dag) {
 
 上面的最大匹配还确定了一组最小链划分。若匹配边为 `u_L -> v_R`，就在原偏序中令 `u` 的后继为 `v`、`v` 的前驱为 `u`：
 
-```cpp
+```text
 successor[u] = matching.match_left[u];
 predecessor[v] = matching.match_right[v];
 ```
@@ -244,7 +244,7 @@ predecessor[v] = matching.match_right[v];
 
 在前面函数已经求出 `reached_right` 后，也可以把最后构造答案的循环替换成下面这段：
 
-```cpp
+```text
 vector<int> antichain;
 for (int tail = 0; tail < n; ++tail) {
     if (matching.match_left[tail] != -1) continue; // 不是链尾
@@ -262,7 +262,7 @@ for (int tail = 0; tail < n; ++tail) {
 
 这个写法与方法一选出的是同一批点。链尾的左副本本来就是搜索起点；每向链首跳一步，走的正是匹配边 `current_R -> predecessor_L`，所以新代表的左副本仍被访问。停止时代表满足
 
-```cpp
+```text
 reached_left[representative] && !reached_right[representative]
 ```
 

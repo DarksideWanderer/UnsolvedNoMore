@@ -121,7 +121,7 @@ public:
 
 这解释了为什么每个状态贡献
 
-```cpp
+```text
 states[v].length - states[states[v].link].length
 ```
 
@@ -208,7 +208,7 @@ string longest_common_substring(
 
 多个串的最长公共子串：用第一个串建 SAM。对每个其余串按上面方法扫描，记录它在每个状态能匹配到的最大长度；再按 `length` 降序令
 
-```cpp
+```text
 best[link[v]] = max(best[link[v]], min(best[v], length[link[v]]));
 ```
 
