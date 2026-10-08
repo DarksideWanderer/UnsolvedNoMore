@@ -29,10 +29,10 @@ $acSource = $acSource.Replace($anchor, $members + "`n" + $anchor)
 $parts = [System.Collections.Generic.List[string]]::new()
 $parts.Add($acSource)
 foreach ($path in @("string/03-Pam.md", "string/07-Kmp.md",
-                    "graph/10-euler-tour-lca.md")) {
+                    "graph/10-euler-tour-lca.md", "string/08-Sa.md")) {
     $parts.Add((Get-CodeBlocks (Join-Path $repoRoot $path)))
 }
-foreach ($name in @("00-range-query.md", "04-parent-tree-tricks.md",
+foreach ($name in @("00-range-query.md", "01-sa-applications.md", "04-parent-tree-tricks.md",
                     "05-ac-applications.md", "06-pam-applications.md",
                     "07-kmp-automaton.md", "08-subsequence-automaton.md",
                     "09-trie-pam.md")) {
@@ -41,6 +41,8 @@ foreach ($name in @("00-range-query.md", "04-parent-tree-tricks.md",
 $parts.Add((Get-Content -LiteralPath (Join-Path $addonRoot "automata_tests.cpp") `
     -Encoding UTF8 -Raw))
 $parts.Add((Get-Content -LiteralPath (Join-Path $addonRoot "trie_pam_tests.cpp") `
+    -Encoding UTF8 -Raw))
+$parts.Add((Get-Content -LiteralPath (Join-Path $addonRoot "substring_count_tests.cpp") `
     -Encoding UTF8 -Raw))
 $executable = Join-Path $addonRoot (".automata-tests-" + [guid]::NewGuid() + ".exe")
 try {

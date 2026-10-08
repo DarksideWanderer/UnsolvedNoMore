@@ -225,10 +225,12 @@ void check_ac(mt19937& rng) {
 }
 
 void check_trie_pam(mt19937& rng);
+void check_substring_count(mt19937& rng);
 
 int main() {
     mt19937 rng(20260908);
     auto texts = binary_strings(8);
+    check_substring_count(rng);
     check_parent_tree(rng);
     cout << "[PASS] parent-tree DP (300 random trees)\n";
     check_kmp_and_subsequence(texts);
